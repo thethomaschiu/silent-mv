@@ -1,4 +1,4 @@
-# MuteVibe 🎬🔇
+# Silent MV 🎬🔇
 
 A lightweight, single-file web app designed to play looping, muted background visuals in fullscreen while your own music or audio plays. Supports both **YouTube links** and **local video files** from your device.
 
