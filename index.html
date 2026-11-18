@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>MuteVibe – Background Video Player</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --surface: #151921;
+      --surface-hover: #1d232e;
+      --border: #2a3241;
+      --accent: #ff0033;
+      --accent-hover: #d9002b;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --warn-bg: rgba(245, 158, 11, 0.12);
+      --warn-border: rgba(245, 158, 11, 0.35);
+      --warn-text: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Setup Screen */
+    #setup-screen {
+      width: 100%;
+      max-width: 560px;
+      padding: 1.5rem;
+      z-index: 10;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 2.25rem 2rem;
+      text-align: center;
+      transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .card.drag-over {
+      border-color: var(--accent);
+      background: var(--surface-hover);
+      transform: scale(1.015);
+    }
+
+    .icon-badge {
+      width: 52px;
+      height: 52px;
+      margin: 0 auto 1.25rem;
+      border-radius: 12px;
+      background: rgba(255, 0, 51, 0.12);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 0.92rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.45;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.8rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s ease, transform 0.1s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 1rem 0;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .file-picker-btn {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.8rem 1rem;
+      font-weight: 500;
+    }
+
+    .file-picker-btn:hover {
+      background: var(--surface-hover);
+      border-color: #3f4b61;
+    }
+
+    .options-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 1rem;
+    }
+
+    .options-row label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+    }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 0.85rem;
+      margin-top: 0.65rem;
+      min-height: 1.2em;
+    }
+
+    /* Local File Protocol Warning */
+    #file-warning {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.9rem 1rem;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 10px;
+      color: var(--warn-text);
+      font-size: 0.83rem;
+      text-align: left;
+      line-height: 1.45;
+    }
+
+    #file-warning code {
+      display: inline-block;
+      margin-top: 0.4rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 6px;
+      color: #fff;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    /* Fullscreen Player Container */
+    #player-container {
+      display: none;
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      z-index: 50;
+    }
+
+    #player-container.active {
+      display: block;
+    }
+
+    #yt-iframe,
+    #local-video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
+      background: #000;
+    }
+
+    #yt-iframe.visible,
+    #local-video.visible {
+      display: block;
+    }
+
+    #local-video {
+      object-fit: contain;
+    }
+
+    /* Floating Controls (hidden in native fullscreen unless hovered/needed) */
+    .floating-controls {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      z-index: 60;
+      opacity: 0.85;
+      transition: opacity 0.2s ease;
+    }
+
+    .floating-controls:hover {
+      opacity: 1;
+    }
+
+    :fullscreen .floating-controls {
+      display: none;
+    }
+
+    .btn-secondary {
+      background: rgba(21, 25, 33, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      padding: 0.55rem 0.9rem;
+      font-size: 0.82rem;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(38, 45, 58, 0.95);
+    }
+
+    #fs-banner {
+      display: none;
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(21, 25, 33, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      padding: 0.65rem 1.1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      color: var(--text);
+      z-index: 60;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    #fs-banner.visible {
+      display: flex;
+    }
+
+    :fullscreen #fs-banner {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Setup / Drop Screen -->
+  <main id="setup-screen">
+    <div class="card" id="drop-zone">
+      <div class="icon-badge">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </div>
+      <h1>MuteVibe</h1>
+      <p class="subtitle">Paste a YouTube link or drop a video file to run a muted, looping visual backdrop while your music plays.</p>
+
+      <form id="url-form" class="input-group">
+        <input
+          type="text"
+          id="url-input"
+          placeholder="https://www.youtube.com/watch?v=... or Video ID"
+          autocomplete="off"
+          autofocus
+        />
+        <button type="submit">Play</button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <input type="file" id="file-input" accept="video/*" hidden />
+      <button type="button" class="file-picker-btn" id="file-picker-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Choose Video File from Device
+      </button>
+
+      <div class="options-row">
+        <label>
+          <input type="checkbox" id="loop-toggle" checked />
+          Loop video (Auto-loop)
+        </label>
+        <label>
+          <input type="checkbox" id="controls-toggle" checked />
+          Show local player controls
+        </label>
+        <label>
+          <input type="checkbox" id="nocookie-toggle" />
+          Use youtube-nocookie.com
+        </label>
+      </div>
+
+      <div class="error-msg" id="error-msg"></div>
+
+      <div id="file-warning">
+        <strong>Note on YouTube Links via <code>file://</code>:</strong> Local video files work fine directly from disk, but YouTube links require an HTTP <code>Referer</code> header (or Error 153 will occur). Host on GitHub Pages or serve locally:<br />
+        <code id="copy-cmd" title="Click to copy">python -m http.server 8000</code>
+      </div>
+    </div>
+  </main>
+
+  <!-- Fullscreen Video Stage -->
+  <div id="player-container">
+    <div class="floating-controls">
+      <button type="button" class="btn-secondary" id="fs-btn">Fullscreen (F)</button>
+      <button type="button" class="btn-secondary" id="back-btn">Change Video (Esc)</button>
+    </div>
+
+    <div id="fs-banner">
+      <span>Browser blocked automatic fullscreen.</span>
+      <button type="button" class="btn-secondary" id="banner-fs-btn">Enter Fullscreen</button>
+    </div>
+
+    <iframe
+      id="yt-iframe"
+      title="YouTube video player"
+      referrerpolicy="strict-origin-when-cross-origin"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+      allowfullscreen
+    ></iframe>
+
+    <video
+      id="local-video"
+      muted
+      autoplay
+      playsinline
+    ></video>
+  </div>
+
+  <script>
+    const setupScreen = document.getElementById("setup-screen");
+    const dropZone = document.getElementById("drop-zone");
+    const urlForm = document.getElementById("url-form");
+    const urlInput = document.getElementById("url-input");
+    const fileInput = document.getElementById("file-input");
+    const filePickerBtn = document.getElementById("file-picker-btn");
+    const loopToggle = document.getElementById("loop-toggle");
+    const controlsToggle = document.getElementById("controls-toggle");
+    const nocookieToggle = document.getElementById("nocookie-toggle");
+    const errorMsg = document.getElementById("error-msg");
+    const fileWarning = document.getElementById("file-warning");
+    const copyCmd = document.getElementById("copy-cmd");
+
+    const playerContainer = document.getElementById("player-container");
+    const ytIframe = document.getElementById("yt-iframe");
+    const localVideo = document.getElementById("local-video");
+    const fsBtn = document.getElementById("fs-btn");
+    const backBtn = document.getElementById("back-btn");
+    const fsBanner = document.getElementById("fs-banner");
+    const bannerFsBtn = document.getElementById("banner-fs-btn");
+
+    let activeObjectUrl = null;
+
+    if (window.location.protocol === "file:") {
+      fileWarning.style.display = "block";
+      copyCmd.addEventListener("click", () => {
+        navigator.clipboard?.writeText("python -m http.server 8000");
+        const orig = copyCmd.textContent;
+        copyCmd.textContent = "Copied: python -m http.server 8000";
+        setTimeout(() => (copyCmd.textContent = orig), 2000);
+      });
+    }
+
+    function extractVideoId(input) {
+      if (!input) return null;
+      const trimmed = input.trim();
+
+      if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+        return trimmed;
+      }
+
+      try {
+        const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+        const host = url.hostname.replace(/^www\./, "");
+
+        if (host === "youtu.be") {
+          const id = url.pathname.split("/").filter(Boolean)[0];
+          return id && /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+        }
+
+        if (host === "youtube.com" || host === "m.youtube.com" || host === "youtube-nocookie.com") {
+          if (url.pathname === "/watch") {
+            const v = url.searchParams.get("v");
+            return v && /^[a-zA-Z0-9_-]{11}$/.test(v) ? v : null;
+          }
+
+          const pathMatch = url.pathname.match(/^\/(embed|shorts|live|v)\/([a-zA-Z0-9_-]{11})/);
+          if (pathMatch) {
+            return pathMatch[2];
+          }
+        }
+      } catch (_) {
+        const fallback = trimmed.match(/(?:v=|\/embed\/|\/shorts\/|\/live\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (fallback) return fallback[1];
+      }
+
+      return null;
+    }
+
+    async function enterFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          await playerContainer.requestFullscreen();
+        }
+        fsBanner.classList.remove("visible");
+      } catch (_) {
+        fsBanner.classList.add("visible");
+      }
+    }
+
+    function cleanupMedia() {
+      ytIframe.classList.remove("visible");
+      ytIframe.src = "about:blank";
+
+      localVideo.pause();
+      localVideo.classList.remove("visible");
+      localVideo.removeAttribute("src");
+      localVideo.load();
+
+      if (activeObjectUrl) {
+        URL.revokeObjectURL(activeObjectUrl);
+        activeObjectUrl = null;
+      }
+    }
+
+    function playYouTube(rawInput) {
+      const videoId = extractVideoId(rawInput);
+      if (!videoId) {
+        errorMsg.textContent = "Please enter a valid YouTube link, 11-character video ID, or drop a local video file.";
+        return;
+      }
+
+      errorMsg.textContent = "";
+      cleanupMedia();
+
+      const domain = nocookieToggle.checked ? "https://www.youtube-nocookie.com" : "https://www.youtube.com";
+      const params = new URLSearchParams({
+        autoplay: "1",
+        mute: "1",
+        rel: "0",
+        playsinline: "1"
+      });
+
+      if (loopToggle.checked) {
+        params.set("loop", "1");
+        params.set("playlist", videoId);
+      }
+
+      if (window.location.origin && window.location.origin !== "null") {
+        params.set("origin", window.location.origin);
+      }
+
+      ytIframe.src = `${domain}/embed/${videoId}?${params.toString()}`;
+      ytIframe.classList.add("visible");
+
+      setupScreen.style.display = "none";
+      playerContainer.classList.add("active");
+      enterFullscreen();
+    }
+
+    function playLocalFile(file) {
+      if (!file) return;
+
+      const isVideoMime = file.type && file.type.startsWith("video/");
+      const isVideoExt = /\.(mp4|webm|ogg|ogv|mov|m4v|mkv|avi)$/i.test(file.name);
+
+      if (!isVideoMime && !isVideoExt) {
+        errorMsg.textContent = "Unsupported file format. Please select a valid video file.";
+        return;
+      }
+
+      errorMsg.textContent = "";
+      cleanupMedia();
+
+      activeObjectUrl = URL.createObjectURL(file);
+      localVideo.src = activeObjectUrl;
+      localVideo.muted = true;
+      localVideo.loop = loopToggle.checked;
+      localVideo.controls = controlsToggle.checked;
+      localVideo.classList.add("visible");
+
+      setupScreen.style.display = "none";
+      playerContainer.classList.add("active");
+
+      localVideo.play().catch(() => {
+        errorMsg.textContent = "Unable to decode this video format in your browser.";
+        resetPlayer();
+      });
+
+      enterFullscreen();
+    }
+
+    function resetPlayer() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      cleanupMedia();
+      playerContainer.classList.remove("active");
+      fsBanner.classList.remove("visible");
+      setupScreen.style.display = "block";
+      urlInput.value = "";
+      fileInput.value = "";
+      urlInput.focus();
+    }
+
+    urlForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      playYouTube(urlInput.value);
+    });
+
+    urlInput.addEventListener("paste", (e) => {
+      const pasted = (e.clipboardData || window.clipboardData).getData("text");
+      if (extractVideoId(pasted)) {
+        e.preventDefault();
+        urlInput.value = pasted.trim();
+        playYouTube(pasted);
+      }
+    });
+
+    filePickerBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        playLocalFile(e.target.files[0]);
+      }
+    });
+
+    ["dragenter", "dragover"].forEach((evt) => {
+      window.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((evt) => {
+      window.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+      });
+    });
+
+    window.addEventListener("drop", (e) => {
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        playLocalFile(e.dataTransfer.files[0]);
+        return;
+      }
+
+      const droppedText =
+        e.dataTransfer.getData("text/uri-list") ||
+        e.dataTransfer.getData("text/plain");
+      if (droppedText) {
+        urlInput.value = droppedText.trim();
+        playYouTube(droppedText);
+      }
+    });
+
+    fsBtn.addEventListener("click", enterFullscreen);
+    bannerFsBtn.addEventListener("click", enterFullscreen);
+    backBtn.addEventListener("click", resetPlayer);
+
+    document.addEventListener("keydown", (e) => {
+      if (!playerContainer.classList.contains("active")) return;
+      if (e.key.toLowerCase() === "f") {
+        enterFullscreen();
+      } else if (e.key === "Escape" && !document.fullscreenElement) {
+        resetPlayer();
+      }
+    });
+
+    const initialParam = new URLSearchParams(window.location.search).get("v");
+    if (initialParam) {
+      urlInput.value = initialParam;
+      playYouTube(initialParam);
+    }
+  </script>
+</body>
+</html>
